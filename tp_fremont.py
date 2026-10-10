@@ -33,7 +33,7 @@ sample_dates = pd.to_datetime([
 #2.
 #print(sample_dates.date) # retourne la partie date
 #print(sample_dates.time) # retourne la partie horaire 
-#print(sample_dates.dayofweek) # retourne Index([0, 5, 5], dtype='int32') qui correspond aux jours de la semaine (0 pour lundi et 7 pour dimanche)
+#print(sample_dates.dayofweek) # retourne Index([0, 5, 5], dtype='int32') qui correspond aux jours de la semaine (0 pour lundi et 6 pour dimanche)
 
 #3. on a déjà que des dates postérieures ou égales au 20 janvier 2024
 
@@ -95,27 +95,53 @@ pivoted=data.pivot_table(values='Total', index=data.index.time, columns=data.ind
 pivoted.plot(legend=False, alpha=0.01)
 plt.xlabel('heures')
 plt.ylabel('nb de passages')
-plt.show()
+#plt.show()
 
 
 ##clasification des jours
-# on transpose, et on remplit les valeurs manquantes par 0
-pca_input = pivoted.T.fillna(0)
+# .T pour transposer et .fillna(0) pour remplir les valeurs manquantes par 0
+pca_input = pivoted.T.fillna(0) 
 
 ###ACP
 from sklearn.decomposition import PCA
 # on utilise le PCA de scikit-learn comme une boite noire
-pca_output = PCA(2).fit_transform(pca_input)
-# on obtient un tableau numpy avec deux colonnes car seulement les deux premières composantes principales ont été demanées
+pca_output = PCA(2).fit_transform(pca_input) #on réduit la dimension du tableau à 2
+print('dimension=',pca_output.shape) #on a bien 2 colonnes
+#on affiche un graphique test sans utiliser le modèle gaussien
+plt.scatter(pca_output[:, 0], pca_output[:, 1], marker='.', color='blue')
+plt.title("graphique test")
+plt.show()
 
 ### GaussianMixture
-type(pca_output), pca_output.shape
-# on voit effectivement que cet ACP semble bien séparer deux clusters
-plt.scatter(pca_output[:, 0], pca_output[:, 1], marker='.', color='green');
-# pour les trouver ces deux clusters, Jake utilise une GaussianMixture
+#Exercice
+#on utilise maintenant un modèle de mélange gaussien pour trouver ces 2 groupes
 from sklearn.mixture import GaussianMixture
 gmm = GaussianMixture(2)
-# c'est ici que tout se passe
-labels = gmm.fit(pca_input).predict(pca_input)
-# la sortie est une association jour -> type
-labels.shape, labels
+labels = gmm.fit(pca_input).predict(pca_input) #on attribue la note à pour le 1er cluster, et 1 pour le 2e
+plt.scatter(pca_output[:,0],pca_output[:,1],c=labels,cmap='viridis')
+plt.title("modèle gaussien")
+plt.show()
+
+##Comparons chaque famille aux profils journaliers
+#Exercice
+plt.plot(pca_input[labels==0].mean(axis=0).values, label="jours de la semaine", color='blue') #.values sert à convertir un objet Pandas en un tableau de nombres lisible par la fonction plt.plot
+plt.plot(pca_input[labels==1].mean(axis=0).values, label='week-end', color='magenta')
+plt.xlabel('heures')
+plt.ylabel("nb de passages")
+plt.legend()
+plt.show()
+#on observe 2 pics pour les jours de lasemaine (du lundi au vendredi) correspondant au moment ou les gens vont et rentrent du travail
+#pour les jours du weekends ont voient que le nomnbre de passage est important surtout entre 10h et 16h (promenades)
+
+##Vérifions avec le jour de la semaine
+#Exercice
+plt.scatter(pca_output[:,0],pca_output[:,1], c=pd.to_datetime(pivoted.columns).dayofweek, cmap='tab10', marker='.') #cmap va nous donner une palette de couleurs
+plt.title('couleurs en fonction du jour de la semaine')
+plt.show()
+
+##Les moutons noirs
+moutons_noirs=pivoted.loc[:, (pd.to_datetime(pivoted.columns).dayofweek<5) & (labels==1)]
+plt.plot(moutons_noirs.mean(axis=1).values, color='black') 
+plt.title('les moutons noirs')
+plt.show()
+#le profil des moutons noirs correspondent au profil des jours du cluster 0
